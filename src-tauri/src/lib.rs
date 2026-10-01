@@ -84,6 +84,59 @@ fn host_widgets(window: WebviewWindow, state: State<AppState>) -> Vec<Widget> {
         .collect()
 }
 
+#[derive(serde::Serialize)]
+struct MonitorInfo {
+    name: String,
+    primary: bool,
+    /// CSS pikseli (widget koordinatlarıyla aynı birim)
+    w: f64,
+    h: f64,
+    scale: f64,
+}
+
+#[tauri::command]
+fn list_monitors(app: AppHandle) -> Result<Vec<MonitorInfo>, String> {
+    let primary = app.primary_monitor().map_err(|e| e.to_string())?.and_then(|m| m.name().cloned());
+    Ok(app
+        .available_monitors()
+        .map_err(|e| e.to_string())?
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let name = m.name().cloned().unwrap_or_else(|| format!("monitor-{i}"));
+            let scale = m.scale_factor();
+            MonitorInfo {
+                primary: primary.as_ref() == Some(&name),
+                name,
+                w: m.size().width as f64 / scale,
+                h: m.size().height as f64 / scale,
+                scale,
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
+/// Arayüzdeki taslak (kaydedilmemiş değişiklikler dahil) dışa aktarılır
+fn export_config(path: String, config: Config) -> Result<(), String> {
+    config::save(&PathBuf::from(path), &config)
+}
+
+/// Dışa aktarılmış dosyayı okur: tam config, widget listesi ya da tek widget kabul edilir.
+#[tauri::command]
+fn read_widgets_file(path: String) -> Result<Vec<Widget>, String> {
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    if let Ok(c) = serde_json::from_str::<Config>(&text) {
+        if !c.widgets.is_empty() {
+            return Ok(c.widgets);
+        }
+    }
+    if let Ok(list) = serde_json::from_str::<Vec<Widget>>(&text) {
+        return Ok(list);
+    }
+    serde_json::from_str::<Widget>(&text).map(|w| vec![w]).map_err(|_| "dosyada widget bulunamadı".into())
+}
+
 // ---------- host pencereleri ----------
 
 fn monitor_signature(app: &AppHandle) -> String {
@@ -276,7 +329,17 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_config, save_config, config_path, is_paused, host_widgets])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            get_config,
+            save_config,
+            config_path,
+            is_paused,
+            host_widgets,
+            list_monitors,
+            export_config,
+            read_widgets_file
+        ])
         .setup(|app| {
             let cfg_path = app.path().app_config_dir()?.join("widgets.json");
             let first_run = !cfg_path.exists();
@@ -306,4 +369,54 @@ pub fn run() {
                 api.prevent_exit();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("masaustu-widget-test-{}-{name}", std::process::id()))
+    }
+
+    fn widget(id: &str) -> Widget {
+        Widget { id: id.into(), name: format!("W {id}"), html: "<b>ş</b>".into(), ..Default::default() }
+    }
+
+    #[test]
+    fn disa_aktarilan_dosya_geri_okunur() {
+        let p = tmp("full.json");
+        let c = Config { widgets: vec![widget("a"), widget("b")] };
+        export_config(p.display().to_string(), c.clone()).unwrap();
+        let back = read_widgets_file(p.display().to_string()).unwrap();
+        assert_eq!(back, c.widgets);
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn liste_ve_tek_widget_bicimleri_kabul_edilir() {
+        let p = tmp("list.json");
+        std::fs::write(&p, serde_json::to_string(&vec![widget("x"), widget("y")]).unwrap()).unwrap();
+        assert_eq!(read_widgets_file(p.display().to_string()).unwrap().len(), 2);
+        std::fs::write(&p, serde_json::to_string(&widget("z")).unwrap()).unwrap();
+        assert_eq!(read_widgets_file(p.display().to_string()).unwrap()[0].id, "z");
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn eksik_alanlar_varsayilanla_dolar() {
+        let p = tmp("partial.json");
+        std::fs::write(&p, r#"{"widgets":[{"id":"k","html":"<i>hi</i>"}]}"#).unwrap();
+        let w = &read_widgets_file(p.display().to_string()).unwrap()[0];
+        assert_eq!((w.w, w.h, w.opacity, w.enabled), (320.0, 180.0, 1.0, true));
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn bozuk_dosya_hata_verir() {
+        let p = tmp("bad.json");
+        std::fs::write(&p, "bu json değil").unwrap();
+        assert!(read_widgets_file(p.display().to_string()).is_err());
+        let _ = std::fs::remove_file(p);
+    }
 }
