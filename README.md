@@ -17,8 +17,8 @@ Windows masaüstüne, **duvar kağıdı katmanına (ikonların arkasına)** göm
 ## Kurulum (Windows 10/11)
 
 1. [Releases](../../releases/latest) sayfasından birini indir:
-   - `Masaüstü.Widget_x.y.z_x64-setup.exe`: önerilen. Yönetici izni istemez, kullanıcı klasörüne kurulur.
-   - `Masaüstü.Widget_x.y.z_x64_en-US.msi`: kurumsal dağıtım için.
+   - `Masaustu.Widget_x.y.z_x64-setup.exe`: önerilen. Yönetici izni istemez, kullanıcı klasörüne kurulur.
+   - `Masaustu.Widget_x.y.z_x64_en-US.msi`: kurumsal dağıtım için.
 2. Çalıştır. Uygulama imzasız olduğu için Windows SmartScreen "Windows bilgisayarınızı korudu" diyebilir: **Ek bilgi → Yine de çalıştır**.
 3. İlk açılışta masaüstüne örnek bir saat gelir ve uygulama başlangıca eklenir.
 
