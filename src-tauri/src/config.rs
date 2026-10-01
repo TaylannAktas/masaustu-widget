@@ -41,10 +41,26 @@ impl Default for Widget {
     }
 }
 
+/// Otomatik duraklatma tercihleri. Kilit ekranında her zaman duraklatılır.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct Settings {
+    /// Öndeki pencere monitörü kaplıyorsa (büyütülmüş/tam ekran) o monitördeki widget'lar dondurulur
+    pub pause_when_covered: bool,
+    pub pause_on_battery: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { pause_when_covered: true, pause_on_battery: false }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(default)]
 pub struct Config {
     pub widgets: Vec<Widget>,
+    pub settings: Settings,
 }
 
 fn sample() -> Config {
@@ -63,6 +79,7 @@ fn sample() -> Config {
                 .into(),
             ..Default::default()
         }],
+        ..Default::default()
     }
 }
 

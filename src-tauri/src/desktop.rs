@@ -120,3 +120,65 @@ pub fn keep_below_icons(hwnd: HWND) {
         let _ = SetWindowPos(hwnd, Some(defview), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 }
+
+// ---------- otomatik duraklatma algılayıcıları ----------
+
+/// Öndeki pencere bir monitörü tamamen kaplıyorsa (büyütülmüş ya da tam ekran) o monitörün adı.
+/// Masaüstünün kendisi, görev çubuğu ve bu uygulamanın pencereleri sayılmaz.
+pub fn covered_monitor() -> Option<String> {
+    use windows::Win32::Graphics::Gdi::*;
+    use windows::Win32::System::Threading::GetCurrentProcessId;
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg.is_invalid() || !IsWindowVisible(fg).as_bool() || IsIconic(fg).as_bool() {
+            return None;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, Some(&mut pid));
+        if pid == GetCurrentProcessId() {
+            return None;
+        }
+        let mut class = [0u16; 64];
+        let n = GetClassNameW(fg, &mut class) as usize;
+        let class = String::from_utf16_lossy(&class[..n]);
+        if matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") {
+            return None;
+        }
+
+        let mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
+        let mut info = MONITORINFOEXW::default();
+        info.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
+        if !GetMonitorInfoW(mon, &mut info as *mut _ as *mut MONITORINFO).as_bool() {
+            return None;
+        }
+        let mut r = Default::default();
+        GetWindowRect(fg, &mut r).ok()?;
+        let m = info.monitorInfo.rcMonitor;
+        let fullscreen = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+        if !(fullscreen || IsZoomed(fg).as_bool()) {
+            return None;
+        }
+        let len = info.szDevice.iter().position(|&c| c == 0).unwrap_or(info.szDevice.len());
+        Some(String::from_utf16_lossy(&info.szDevice[..len]))
+    }
+}
+
+/// Kilit ekranında girdi masaüstü Winlogon'a geçer; normal süreç onu açamaz.
+pub fn session_locked() -> bool {
+    use windows::Win32::System::StationsAndDesktops::*;
+    unsafe {
+        match OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_ACCESS_FLAGS(0x0001)) {
+            Ok(d) => {
+                let _ = CloseDesktop(d);
+                false
+            }
+            Err(_) => true,
+        }
+    }
+}
+
+pub fn on_battery() -> bool {
+    use windows::Win32::System::Power::*;
+    let mut s = SYSTEM_POWER_STATUS::default();
+    unsafe { GetSystemPowerStatus(&mut s).is_ok() && s.ACLineStatus == 0 }
+}

@@ -41,6 +41,10 @@ aside { grid-row: 1 / 3; display: flex; flex-direction: column; gap: 10px; paddi
 #list li.active { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
 #list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #editMode { border-style: dashed; }
+.perf { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.perf summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+.perf label { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.perf .note { margin: 2px 0 0 22px; color: var(--muted); font-size: 12px; }
 .aside-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
 /* ana alan */

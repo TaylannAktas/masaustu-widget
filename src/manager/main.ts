@@ -12,7 +12,7 @@ type Tab = "html" | "css" | "js";
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const num = (id: string) => $<HTMLInputElement>(id);
 
-let draft: Config = { widgets: [] };
+let draft: Config = { widgets: [], settings: { pause_when_covered: true, pause_on_battery: false } };
 let savedJson = "";
 let selected: string | null = null;
 let tab: Tab = "html";
@@ -132,6 +132,11 @@ function renderMap() {
   map.replaceChildren(...rects);
 }
 
+function renderSettings() {
+  $<HTMLInputElement>("pauseCovered").checked = draft.settings.pause_when_covered;
+  $<HTMLInputElement>("pauseBattery").checked = draft.settings.pause_on_battery;
+}
+
 function changed() {
   $<HTMLButtonElement>("save").disabled = !isDirty();
   // document.title yerel pencere başlığına yansımıyor
@@ -141,6 +146,14 @@ function changed() {
 }
 
 function bind() {
+  $<HTMLInputElement>("pauseCovered").onchange = (e) => {
+    draft.settings.pause_when_covered = (e.target as HTMLInputElement).checked;
+    changed();
+  };
+  $<HTMLInputElement>("pauseBattery").onchange = (e) => {
+    draft.settings.pause_on_battery = (e.target as HTMLInputElement).checked;
+    changed();
+  };
   $<HTMLInputElement>("name").oninput = (e) => {
     current()!.name = (e.target as HTMLInputElement).value;
     renderList();
@@ -288,6 +301,7 @@ async function init() {
   savedJson = JSON.stringify(draft);
   $("path").textContent = await invoke<string>("config_path");
   bind();
+  renderSettings();
   select(draft.widgets[0]?.id ?? null);
 
   $("editMode").onclick = async () => {
@@ -306,6 +320,7 @@ async function init() {
     if (isDirty()) return say("Ayarlar başka yerden değişti — kaydedersen o değişikliklerin üzerine yazılır", "err");
     draft = fresh;
     savedJson = JSON.stringify(fresh);
+    renderSettings();
     select(current() ? selected : (draft.widgets[0]?.id ?? null));
     changed();
     say("Masaüstündeki değişiklikler alındı", "ok");

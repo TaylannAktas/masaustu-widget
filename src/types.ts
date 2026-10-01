@@ -13,6 +13,12 @@ export interface Widget {
   enabled: boolean;
 }
 
+export interface Settings {
+  pause_when_covered: boolean;
+  pause_on_battery: boolean;
+}
+
 export interface Config {
   widgets: Widget[];
+  settings: Settings;
 }

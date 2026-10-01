@@ -24,6 +24,8 @@ struct Host {
     primary: bool,
     #[cfg(windows)]
     hwnd: isize,
+    /// Otomatik duraklatmayla WebView dondurulmuş mu
+    asleep: bool,
 }
 
 /// Tepsideki "Duraklat" işaretini dışarıdan (CLI) değişince eşitlemek için
@@ -198,6 +200,7 @@ fn open_hosts(app: &AppHandle) -> tauri::Result<()> {
             monitor: name,
             #[cfg(windows)]
             hwnd,
+            asleep: false,
         });
     }
     // Hiçbiri ana monitör olarak işaretlenmediyse ilki üstlensin
@@ -223,10 +226,67 @@ fn rebuild_hosts(app: &AppHandle) {
     }
 }
 
-/// Explorer yeniden başlarsa ya da monitör düzeni değişirse host'ları yeniden kurar.
+/// Saniyede bir otomatik duraklatmayı, 3 saniyede bir gömmenin ve monitör düzeninin sağlamlığını denetler.
 fn spawn_watcher(app: AppHandle) {
-    std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_secs(3));
+    std::thread::spawn(move || {
+        for tick in 0u64.. {
+            std::thread::sleep(Duration::from_secs(1));
+            #[cfg(windows)]
+            auto_pause(&app);
+            if tick % 3 == 2 {
+                check_embedding(&app);
+            }
+        }
+    });
+}
+
+/// Görünmeyen monitörün WebView'ı dondurulur: çizim durur, JS askıya alınır ama durum korunur.
+/// (Pencereyi gizlemek WebView2'yi yavaşlatmıyor; ölçümle doğrulandı.)
+#[cfg(windows)]
+fn auto_pause(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let settings = state.config.lock().unwrap().settings.clone();
+    let editing = state.edit_draft.lock().unwrap().is_some();
+    let locked = desktop::session_locked();
+    let battery = settings.pause_on_battery && desktop::on_battery();
+    let covered = if settings.pause_when_covered { desktop::covered_monitor() } else { None };
+
+    let mut changes = Vec::new();
+    for h in state.hosts.lock().unwrap().iter_mut() {
+        let want = !editing && (locked || battery || covered.as_deref() == Some(h.monitor.as_str()));
+        if want != h.asleep {
+            h.asleep = want;
+            changes.push((h.label.clone(), want));
+        }
+    }
+    // Kilidi bırakıp uygula: with_webview ana iş parçacığına gider, orada host_widgets aynı kilidi ister
+    for (label, asleep) in changes {
+        let why = if locked { "kilit" } else if battery { "pil" } else if asleep { "üstü kapalı" } else { "görünür" };
+        println!("{label}: {} ({why})", if asleep { "donduruldu" } else { "uyandırıldı" });
+        set_webview_active(app, &label, !asleep);
+    }
+}
+
+#[cfg(windows)]
+fn set_webview_active(app: &AppHandle, label: &str, active: bool) {
+    use webview2_com::{Microsoft::Web::WebView2::Win32::ICoreWebView2_3, TrySuspendCompletedHandler};
+    use windows::core::Interface;
+    let Some(win) = app.get_webview_window(label) else { return };
+    let _ = win.with_webview(move |wv| unsafe {
+        let c = wv.controller();
+        // Görünür yapmak askıyı da otomatik kaldırır
+        let _ = c.SetIsVisible(active);
+        if !active {
+            if let Ok(core3) = c.CoreWebView2().and_then(|core| core.cast::<ICoreWebView2_3>()) {
+                let _ = core3.TrySuspend(&TrySuspendCompletedHandler::create(Box::new(|_, _| Ok(()))));
+            }
+        }
+    });
+}
+
+fn check_embedding(app: &AppHandle) {
+    {
+        let app = app.clone();
         let state = app.state::<AppState>();
         let sig_changed = *state.monitor_sig.lock().unwrap() != monitor_signature(&app);
         #[cfg(windows)]
@@ -245,7 +305,7 @@ fn spawn_watcher(app: AppHandle) {
             println!("yeniden kurulum (monitör değişti: {sig_changed}, gömme koptu: {detached})");
             rebuild_hosts(&app);
         }
-    });
+    }
 }
 
 fn set_paused(app: &AppHandle, paused: bool) {
@@ -306,6 +366,7 @@ fn open_editors(app: &AppHandle) -> Result<(), String> {
             primary,
             #[cfg(windows)]
             hwnd: 0,
+            asleep: false,
         });
     }
     *state.editors.lock().unwrap() = editors;
@@ -493,7 +554,7 @@ mod tests {
     #[test]
     fn disa_aktarilan_dosya_geri_okunur() {
         let p = tmp("full.json");
-        let c = Config { widgets: vec![widget("a"), widget("b")] };
+        let c = Config { widgets: vec![widget("a"), widget("b")], ..Default::default() };
         export_config(p.display().to_string(), c.clone()).unwrap();
         let back = read_widgets_file(p.display().to_string()).unwrap();
         assert_eq!(back, c.widgets);
