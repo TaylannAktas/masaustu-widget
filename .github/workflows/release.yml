@@ -1,0 +1,46 @@
+# v* etiketi push edilince Windows kurulum dosyalarını derleyip taslak Release oluşturur.
+name: Yayın
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: npm ci
+
+      - name: Birim testleri
+        run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Masaüstü Widget ${{ github.ref_name }}"
+          releaseBody: |
+            Windows 10/11 için kurulum dosyaları:
+            - `*-setup.exe`: önerilen, yönetici izni istemez
+            - `*.msi`: kurumsal dağıtım için
+
+            Uygulama imzasız olduğu için SmartScreen uyarı verebilir: **Ek bilgi → Yine de çalıştır**.
+          releaseDraft: true
+          prerelease: false

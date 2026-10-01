@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Masaustu Widget",
+  "productName": "Masaüstü Widget",
   "version": "0.1.0",
   "identifier": "com.taylan.masaustuwidget",
   "build": {
@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [],
     "security": {
       "csp": null
@@ -18,13 +18,29 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "publisher": "TaylannAktas",
+    "copyright": "© 2026 TaylannAktas — MIT",
+    "category": "Utility",
+    "shortDescription": "Masaüstüne gömülen, HTML/JS ile yazılan canlı widget'lar",
+    "longDescription": "Widget'ları duvar kağıdı katmanına, ikonların arkasına gömer. İçerik serbest HTML/CSS/JS; görünmediğinde otomatik donar.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "languages": [
+          "Turkish"
+        ],
+        "installMode": "currentUser"
+      }
+    }
   }
 }
