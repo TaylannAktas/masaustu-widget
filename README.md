@@ -71,6 +71,8 @@ Ayarlar `%APPDATA%\com.taylan.masaustuwidget\widgets.json` dosyasında tutulur.
 
 ## Kaynaktan derleme
 
+Geliştirmeye devam edecekler (ve yapay zekâ ajanları) için mimari, tuzaklar, doğrulama betikleri ve yayın adımları [CLAUDE.md](CLAUDE.md) dosyasında.
+
 Gerekenler: [Rust](https://rustup.rs) (stable, MSVC), [Node.js](https://nodejs.org) 20+, [Tauri ön koşulları](https://tauri.app/start/prerequisites/) (Visual Studio C++ Build Tools).
 
 ```sh
