@@ -11,7 +11,7 @@ export default defineConfig(() => ({
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   build: {
-    rollupOptions: { input: { main: "index.html", host: "host.html" } },
+    rollupOptions: { input: { main: "index.html", host: "host.html", edit: "edit.html" } },
   },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {

@@ -1,5 +1,6 @@
 // Yönetim arayüzü: tüm değişiklikler önce taslakta tutulur, "Kaydet" ile masaüstüne gider.
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Config, Widget } from "../types";
@@ -288,6 +289,27 @@ async function init() {
   $("path").textContent = await invoke<string>("config_path");
   bind();
   select(draft.widgets[0]?.id ?? null);
+
+  $("editMode").onclick = async () => {
+    // Kaydedilmemiş taslak düzenleme moduna yansımaz; önce kaydettir
+    if (isDirty()) return say("Düzenleme moduna geçmeden önce kaydet", "err");
+    await invoke("start_edit");
+  };
+  await listen<boolean>("edit-mode", (e) => {
+    $<HTMLButtonElement>("editMode").disabled = e.payload;
+    if (e.payload) say("Masaüstünde düzenleniyor…");
+  });
+  // Ayarlar başka yerden (düzenleme modu) değişince taslağı tazele; kaydedilmemiş iş varsa ezme
+  await listen("config-changed", async () => {
+    const fresh = await invoke<Config>("get_config");
+    if (JSON.stringify(fresh) === savedJson) return;
+    if (isDirty()) return say("Ayarlar başka yerden değişti — kaydedersen o değişikliklerin üzerine yazılır", "err");
+    draft = fresh;
+    savedJson = JSON.stringify(fresh);
+    select(current() ? selected : (draft.widgets[0]?.id ?? null));
+    changed();
+    say("Masaüstündeki değişiklikler alındı", "ok");
+  });
   changed();
   say(`${draft.widgets.length} widget yüklendi`);
 }

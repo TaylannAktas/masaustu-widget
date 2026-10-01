@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Düzenleme</title>
+  <style>
+    :root { color-scheme: dark; --accent: #748ffc; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; user-select: none; }
+    /* Arkadaki pencereler karartılır; widget'ların canlı kopyaları kutuların içinde */
+    body { background: rgba(8, 10, 18, .6); font: 13px "Segoe UI Variable Text", system-ui, sans-serif; color: #e5e7eb; }
+
+    .box { position: absolute; outline: 1.5px dashed #ffffffa0; outline-offset: -1px; cursor: move; touch-action: none; }
+    .box iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; pointer-events: none; }
+    .box:hover { outline-color: #fff; background: #ffffff0d; }
+    .box.sel { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    .box .tag {
+      position: absolute; left: 0; top: -26px; padding: 3px 8px; border-radius: 5px; white-space: nowrap;
+      background: #1b1e23e6; font-variant-numeric: tabular-nums; pointer-events: none; z-index: 1;
+    }
+    .box.sel .tag { background: var(--accent); color: #0f1220; font-weight: 600; }
+    .h { position: absolute; z-index: 2; width: 12px; height: 12px; background: #fff; border: 2px solid var(--accent); border-radius: 3px; display: none; }
+    .box.sel .h, .box:hover .h { display: block; }
+    .h[data-d="nw"] { left: -7px; top: -7px; cursor: nwse-resize; }
+    .h[data-d="n"]  { left: calc(50% - 6px); top: -7px; cursor: ns-resize; }
+    .h[data-d="ne"] { right: -7px; top: -7px; cursor: nesw-resize; }
+    .h[data-d="e"]  { right: -7px; top: calc(50% - 6px); cursor: ew-resize; }
+    .h[data-d="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+    .h[data-d="s"]  { left: calc(50% - 6px); bottom: -7px; cursor: ns-resize; }
+    .h[data-d="sw"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
+    .h[data-d="w"]  { left: -7px; top: calc(50% - 6px); cursor: ew-resize; }
+
+    .bar {
+      position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 10;
+      display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 16px; border-radius: 10px;
+      background: #1b1e23f2; border: 1px solid #ffffff1f; box-shadow: 0 8px 30px #0008;
+    }
+    .bar b { font-weight: 600; }
+    .bar .hint { color: #949cab; }
+    .bar label { display: flex; align-items: center; gap: 6px; }
+    .bar button { font: inherit; color: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #ffffff2a; background: transparent; cursor: pointer; }
+    .bar button.primary { background: var(--accent); border-color: var(--accent); color: #0f1220; font-weight: 600; }
+    .empty { position: fixed; inset: 0; display: grid; place-items: center; color: #949cab; font-size: 15px; pointer-events: none; }
+  </style>
+  <script type="module" src="/src/edit/edit.ts"></script>
+</head>
+<body>
+  <div class="bar">
+    <b>Düzenleme modu</b>
+    <span class="hint">Sürükle · kenarlardan boyutlandır · oklar ince ayar · Alt: ızgarasız</span>
+    <label><input type="checkbox" id="grid" checked /> 8 px ızgara</label>
+    <button id="cancel">İptal <kbd>Esc</kbd></button>
+    <button id="done" class="primary">Kaydet ve çık <kbd>Enter</kbd></button>
+  </div>
+</body>
+</html>

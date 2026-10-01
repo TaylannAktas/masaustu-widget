@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "host",
-  "description": "Masaüstüne gömülü host pencereleri: yalnızca olay dinleme ve uygulama komutları",
-  "windows": ["host-*"],
-  "permissions": ["core:default"]
+  "description": "Gömülü host pencereleri ve düzenleme katmanları: olay dinleme ve uygulama komutları",
+  "windows": [
+    "host-*",
+    "edit-*"
+  ],
+  "permissions": [
+    "core:default"
+  ]
 }

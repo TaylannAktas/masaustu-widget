@@ -37,6 +37,10 @@ struct AppState {
     /// Yeniden kurulumda etiket çakışmasın diye her kuşak farklı etiket alır
     generation: AtomicU32,
     monitor_sig: Mutex<String>,
+    /// Düzenleme modunda her monitörün üstündeki katman pencereleri (hwnd kullanılmaz)
+    editors: Mutex<Vec<Host>>,
+    /// Düzenleme sürerken host'lar bu taslağı çizer; kaydedilince yalnızca konum/boyut config'e aktarılır
+    edit_draft: Mutex<Option<Config>>,
 }
 
 // ---------- komutlar ----------
@@ -63,16 +67,19 @@ fn is_paused(state: State<AppState>) -> bool {
     state.paused.load(Ordering::Relaxed)
 }
 
-/// Çağıran host'un monitörüne düşen widget'lar. Monitörü bulunamayanlar ana monitöre gider.
+/// Çağıran host'un (ya da düzenleme katmanının) monitörüne düşen widget'lar.
+/// Monitörü bulunamayanlar ana monitöre gider. Düzenleme sürerken taslak kullanılır.
 #[tauri::command]
 fn host_widgets(window: WebviewWindow, state: State<AppState>) -> Vec<Widget> {
     let hosts = state.hosts.lock().unwrap();
-    let Some(me) = hosts.iter().find(|h| h.label == window.label()) else { return vec![] };
+    let editors = state.editors.lock().unwrap();
+    let Some(me) = hosts.iter().chain(editors.iter()).find(|h| h.label == window.label()) else { return vec![] };
     let known = |m: &String| hosts.iter().any(|h| &h.monitor == m);
-    state
-        .config
-        .lock()
-        .unwrap()
+    let draft = state.edit_draft.lock().unwrap();
+    let config = state.config.lock().unwrap();
+    draft
+        .as_ref()
+        .unwrap_or(&config)
         .widgets
         .iter()
         .filter(|w| w.enabled)
@@ -254,6 +261,96 @@ fn set_paused(app: &AppHandle, paused: bool) {
     let _ = app.emit("paused", paused);
 }
 
+// ---------- düzenleme modu ----------
+
+/// Her monitörün üstüne, ikonların ve pencerelerin önünde etkileşimli bir katman açar.
+/// async olmalı: Windows'ta senkron komut içinde pencere oluşturmak ana iş parçacığını kilitler.
+#[tauri::command]
+async fn start_edit(app: AppHandle) -> Result<(), String> {
+    open_editors(&app)
+}
+
+fn open_editors(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    {
+        let mut draft = state.edit_draft.lock().unwrap();
+        if draft.is_some() {
+            return Ok(());
+        }
+        *draft = Some(state.config.lock().unwrap().clone());
+    }
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let targets: Vec<(String, bool)> = state.hosts.lock().unwrap().iter().map(|h| (h.monitor.clone(), h.primary)).collect();
+    let mut editors = Vec::new();
+    for (i, (name, primary)) in targets.into_iter().enumerate() {
+        let Some(m) = monitors.iter().find(|m| m.name() == Some(&name)).or(monitors.get(i)) else { continue };
+        let label = format!("edit-{i}");
+        let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("edit.html".into()))
+            .title("Masaüstü Widget — düzenleme")
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .skip_taskbar(true)
+            .always_on_top(true)
+            .resizable(false)
+            .visible(false)
+            .build()
+            .map_err(|e| e.to_string())?;
+        let _ = win.set_position(*m.position());
+        let _ = win.set_size(*m.size());
+        let _ = win.show();
+        let _ = win.set_focus();
+        editors.push(Host {
+            label,
+            monitor: name,
+            primary,
+            #[cfg(windows)]
+            hwnd: 0,
+        });
+    }
+    *state.editors.lock().unwrap() = editors;
+    let _ = app.emit("edit-mode", true);
+    Ok(())
+}
+
+/// Sürükleme/boyutlandırma sırasında taslağı günceller; host'lar canlı olarak yeni konuma geçer.
+#[tauri::command]
+fn edit_move(app: AppHandle, id: String, x: f64, y: f64, w: f64, h: f64) {
+    let state = app.state::<AppState>();
+    if let Some(d) = state.edit_draft.lock().unwrap().as_mut() {
+        if let Some(wd) = d.widgets.iter_mut().find(|wd| wd.id == id) {
+            (wd.x, wd.y, wd.w, wd.h) = (x, y, w, h);
+        }
+    }
+    let _ = app.emit("config-changed", ());
+}
+
+/// Kaydedilirse yalnızca konum/boyut güncel config'e aktarılır; düzenleme sırasında
+/// yönetim penceresinden yapılmış başka değişiklikler ezilmez.
+#[tauri::command]
+async fn end_edit(app: AppHandle, save: bool) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let Some(draft) = state.edit_draft.lock().unwrap().take() else { return Ok(()) };
+    let mut result = Ok(());
+    if save {
+        let mut config = state.config.lock().unwrap();
+        for w in config.widgets.iter_mut() {
+            if let Some(d) = draft.widgets.iter().find(|d| d.id == w.id) {
+                (w.x, w.y, w.w, w.h) = (d.x, d.y, d.w, d.h);
+            }
+        }
+        result = config::save(&state.cfg_path, &config);
+    }
+    for e in state.editors.lock().unwrap().drain(..) {
+        if let Some(w) = app.get_webview_window(&e.label) {
+            let _ = w.destroy();
+        }
+    }
+    let _ = app.emit("config-changed", ());
+    let _ = app.emit("edit-mode", false);
+    result
+}
+
 // ---------- yönetim penceresi ve tepsi ----------
 
 fn open_manager(app: &AppHandle) {
@@ -273,7 +370,7 @@ fn open_manager(app: &AppHandle) {
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
     let open = MenuItemBuilder::with_id("open", "Aç").build(app)?;
-    let edit = MenuItemBuilder::with_id("edit", "Düzenleme modu (yakında)").enabled(false).build(app)?;
+    let edit = MenuItemBuilder::with_id("edit", "Düzenleme modu").build(app)?;
     let pause = CheckMenuItemBuilder::with_id("pause", "Duraklat").build(app)?;
     let autostart = CheckMenuItemBuilder::with_id("autostart", "Başlangıçta çalıştır")
         .checked(autostart_on)
@@ -295,6 +392,11 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, e| match e.id().as_ref() {
             "open" => open_manager(app),
+            "edit" => {
+                if let Err(e) = open_editors(app) {
+                    eprintln!("düzenleme modu açılamadı: {e}");
+                }
+            }
             "pause" => set_paused(app, pause.is_checked().unwrap_or(false)),
             "autostart" => {
                 let al = app.autolaunch();
@@ -338,7 +440,10 @@ pub fn run() {
             host_widgets,
             list_monitors,
             export_config,
-            read_widgets_file
+            read_widgets_file,
+            start_edit,
+            edit_move,
+            end_edit
         ])
         .setup(|app| {
             let cfg_path = app.path().app_config_dir()?.join("widgets.json");
@@ -350,6 +455,8 @@ pub fn run() {
                 paused: AtomicBool::new(false),
                 generation: AtomicU32::new(0),
                 monitor_sig: Mutex::new(String::new()),
+                editors: Mutex::new(Vec::new()),
+                edit_draft: Mutex::new(None),
             });
             // Geliştirme sürümünde debug exe'yi başlangıca kaydetmemek için yalnızca release'de
             if first_run && !cfg!(debug_assertions) {

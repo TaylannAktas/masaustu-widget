@@ -40,6 +40,7 @@ aside { grid-row: 1 / 3; display: flex; flex-direction: column; gap: 10px; paddi
 #list li:hover { background: var(--panel-2); }
 #list li.active { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
 #list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#editMode { border-style: dashed; }
 .aside-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
 /* ana alan */
