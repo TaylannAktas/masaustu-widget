@@ -10,7 +10,10 @@
 <body>
   <aside>
     <div class="brand">Masaüstü Widget</div>
-    <button id="new" class="primary">+ Yeni widget</button>
+    <div class="new-wrap">
+      <button id="new" class="primary" aria-haspopup="menu">+ Yeni widget</button>
+      <div id="templates" class="menu" role="menu" hidden></div>
+    </div>
     <ul id="list"></ul>
     <details class="perf">
       <summary>Performans</summary>

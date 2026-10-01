@@ -2,6 +2,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Widget } from "../types";
 import { srcdoc } from "../widget-doc";
+import { installBridge } from "../bridge";
+
+installBridge();
 
 type Dir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 const MIN = 40;

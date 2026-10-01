@@ -1,3 +1,4 @@
+mod bridge;
 mod config;
 #[cfg(windows)]
 mod desktop;
@@ -504,7 +505,9 @@ pub fn run() {
             read_widgets_file,
             start_edit,
             edit_move,
-            end_edit
+            end_edit,
+            bridge::widget_fetch,
+            bridge::system_info
         ])
         .setup(|app| {
             let cfg_path = app.path().app_config_dir()?.join("widgets.json");

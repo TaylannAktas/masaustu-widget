@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { Widget } from "../types";
 import { srcdoc } from "../widget-doc";
+import { installBridge } from "../bridge";
+
+installBridge();
 
 const frames = new Map<string, { el: HTMLIFrameElement; content: string }>();
 let paused = false;

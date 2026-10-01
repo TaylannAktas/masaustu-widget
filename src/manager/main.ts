@@ -5,6 +5,10 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Config, Widget } from "../types";
 import { srcdoc } from "../widget-doc";
+import { installBridge } from "../bridge";
+import { TEMPLATES } from "../templates";
+
+installBridge();
 
 interface MonitorInfo { name: string; primary: boolean; w: number; h: number; scale: number }
 type Tab = "html" | "css" | "js";
@@ -202,17 +206,32 @@ function bind() {
   };
   document.querySelectorAll<HTMLButtonElement>(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab as Tab)));
 
-  $("new").onclick = () => {
-    const w: Widget = {
-      id: newId(), name: "Yeni widget", monitor: null, x: 80, y: 80, w: 320, h: 180, opacity: 1, enabled: true,
-      html: `<div class="card">Merhaba!</div>`,
-      css: `.card {\n  height: 100vh; display: grid; place-items: center;\n  color: #fff; font: 600 28px system-ui;\n  background: rgba(20, 30, 60, .5); border-radius: 16px;\n}`,
-      js: "",
-    };
-    draft.widgets.push(w);
-    select(w.id);
-    changed();
+  // "+ Yeni widget" şablon menüsünü açar
+  const menu = $("templates");
+  menu.replaceChildren(
+    ...TEMPLATES.map((t) => {
+      const b = document.createElement("button");
+      b.innerHTML = `<b></b><small></small>`;
+      b.querySelector("b")!.textContent = t.name;
+      b.querySelector("small")!.textContent = t.hint;
+      b.onclick = () => {
+        menu.hidden = true;
+        const { key: _k, hint: _h, ...fields } = t;
+        const w: Widget = { id: newId(), monitor: null, x: 80, y: 80, opacity: 1, enabled: true, ...fields };
+        draft.widgets.push(w);
+        select(w.id);
+        changed();
+      };
+      return b;
+    }),
+  );
+  $("new").onclick = (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
   };
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target as Node)) menu.hidden = true;
+  });
   $("dup").onclick = () => {
     const w = current()!;
     const copy = { ...w, id: newId(), name: `${w.name} (kopya)`, x: w.x + 24, y: w.y + 24 };
