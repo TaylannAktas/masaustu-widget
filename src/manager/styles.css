@@ -1,0 +1,15 @@
+:root { color-scheme: light dark; --bg: #f6f7f9; --fg: #1b1d22; --muted: #6b7280; --panel: #fff; --line: #d8dbe0; --accent: #3b5bdb; }
+@media (prefers-color-scheme: dark) { :root { --bg: #15171b; --fg: #e6e8eb; --muted: #9aa1ab; --panel: #1d2026; --line: #2d3139; --accent: #748ffc; } }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  background: var(--bg); color: var(--fg); font: 14px system-ui, sans-serif; }
+header { display: flex; align-items: baseline; gap: 12px; }
+h1 { margin: 0; font-size: 18px; }
+.hint { color: var(--muted); }
+textarea { flex: 1; resize: none; padding: 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--fg); font: 13px/1.5 Consolas, monospace; }
+footer { display: flex; align-items: center; gap: 8px; }
+button { padding: 7px 14px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+button.ghost { background: transparent; color: var(--accent); }
+#status.ok { color: #2f9e44; } #status.err { color: #e03131; }
+#path { margin-left: auto; color: var(--muted); font-size: 12px; }

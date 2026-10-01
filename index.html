@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Masaüstü Widget</title>
+  <link rel="stylesheet" href="/src/manager/styles.css" />
+  <script type="module" src="/src/manager/main.ts"></script>
+</head>
+<body>
+  <header>
+    <h1>Masaüstü Widget</h1>
+    <span class="hint">Geçici ham JSON düzenleyici — görsel arayüz Faz 2'de</span>
+  </header>
+  <textarea id="json" spellcheck="false"></textarea>
+  <footer>
+    <button id="save">Kaydet</button>
+    <button id="reload" class="ghost">Diskten yenile</button>
+    <span id="status"></span>
+    <code id="path"></code>
+  </footer>
+</body>
+</html>
